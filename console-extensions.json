@@ -30,6 +30,21 @@
     }
   },
   {
+    "type": "console.tab/horizontalNav",
+    "properties": {
+      "model": {
+        "group": "kuadrant.io",
+        "version": "v1",
+        "kind": "RateLimitPolicy"
+      },
+      "page": {
+        "name": "Observability",
+        "href": "observability"
+      },
+      "component": { "$codeRef": "RateLimitPolicyObservabilityTab" }
+    }
+  },
+  {
     "type": "console.page/route",
     "properties": {
       "exact": true,
@@ -214,6 +229,17 @@
     }
   },
   {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "kuadrant-observability-admin",
+      "name": "%plugin__kuadrant-console-plugin~Observability%",
+      "href": "/kuadrant/observability",
+      "perspective": "admin",
+      "section": "kuadrant-section-admin",
+      "badge": "dev"
+    }
+  },
+  {
     "type": "console.navigation/section",
     "properties": {
       "id": "kuadrant-section-dev",
@@ -250,6 +276,25 @@
       "perspective": "dev",
       "section": "kuadrant-section-dev",
       "badge": "dev"
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "kuadrant-observability-dev",
+      "name": "%plugin__kuadrant-console-plugin~Observability%",
+      "href": "/kuadrant/observability",
+      "perspective": "dev",
+      "section": "kuadrant-section-dev",
+      "badge": "dev"
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": true,
+      "path": "/kuadrant/observability",
+      "component": { "$codeRef": "KuadrantObservabilityPage" }
     }
   }
 ]
