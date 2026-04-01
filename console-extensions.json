@@ -395,5 +395,13 @@
       "component": { "$codeRef": "ApiManagementPage" },
       "exact": false
     }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/api-products/:namespace/:name",
+      "component": { "$codeRef": "ApiProductDetailPage" },
+      "exact": true
+    }
   }
 ]

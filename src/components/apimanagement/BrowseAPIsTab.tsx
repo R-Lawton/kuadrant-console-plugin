@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom-v5-compat';
 import { Table, TableHeader, TableBody } from '@patternfly/react-table/deprecated';
 import {
   Button,
@@ -39,6 +40,7 @@ export const BrowseAPIsTab: React.FC<BrowseAPIsTabProps> = ({
   onRequestCreated,
 }) => {
   const { t } = useTranslation('plugin__kuadrant-console-plugin');
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [selectedProduct, setSelectedProduct] = React.useState<APIProduct | null>(null);
   const [selectedPlan, setSelectedPlan] = React.useState<string>('');
@@ -112,10 +114,25 @@ export const BrowseAPIsTab: React.FC<BrowseAPIsTabProps> = ({
 
   const rows = publishedProducts.map((product) => {
     const tags = product.spec.tags || [];
+    const productName = product.spec.displayName || product.metadata?.name;
 
     return {
       cells: [
-        product.spec.displayName || product.metadata?.name,
+        {
+          title: (
+            <Button
+              variant="link"
+              isInline
+              onClick={() =>
+                navigate(
+                  `/api-products/${product.metadata?.namespace}/${product.metadata?.name}`,
+                )
+              }
+            >
+              {productName}
+            </Button>
+          ),
+        },
         product.spec.description || '-',
         product.spec.version || '-',
         {

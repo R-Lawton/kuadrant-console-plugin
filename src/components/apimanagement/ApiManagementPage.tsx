@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useHistory, useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom-v5-compat';
 import { PageSection, Title, Alert } from '@patternfly/react-core';
 import { BrowseAPIsTab } from './BrowseAPIsTab';
 import { MyAPIsTab } from './MyAPIsTab';
@@ -19,7 +20,7 @@ const ApiManagementPage: React.FC = () => {
   const { t } = useTranslation('plugin__kuadrant-console-plugin');
   const { ns } = useParams<{ ns: string }>();
   const [activeNamespace, setActiveNamespace] = useActiveNamespace();
-  const history = useHistory();
+  const navigate = useNavigate();
   const location = useLocation();
   const [requestRefresh, setRequestRefresh] = React.useState(0);
 
@@ -64,14 +65,14 @@ const ApiManagementPage: React.FC = () => {
     // navigate to My Requests section
     const basePath =
       ns && ns !== '#ALL_NS#' ? `/api-management/ns/${ns}` : '/api-management/all-namespaces';
-    history.push(`${basePath}/my-requests`);
+    navigate(`${basePath}/my-requests`);
   };
 
   const handleNamespaceChange = (newNamespace: string) => {
     if (newNamespace !== '#ALL_NS#') {
-      history.replace(`/api-management/ns/${newNamespace}/${currentSection}`);
+      navigate(`/api-management/ns/${newNamespace}/${currentSection}`, { replace: true });
     } else {
-      history.replace(`/api-management/all-namespaces/${currentSection}`);
+      navigate(`/api-management/all-namespaces/${currentSection}`, { replace: true });
     }
   };
 
