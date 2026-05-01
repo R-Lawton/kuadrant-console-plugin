@@ -223,14 +223,6 @@ export const RESOURCES = {
     isKuadrantInternal: false,
     createPath: 'APIProductCreatePage',
   },
-  APIKey: {
-    gvk: { group: 'devportal.kuadrant.io', version: 'v1alpha1', kind: 'APIKey' },
-    plural: 'APIKeys',
-    isPolicy: false,
-    isGatewayAPI: false,
-    showInTopologyByDefault: false,
-    isKuadrantInternal: false,
-  },
 } as const;
 
 // type-safe resource keys
