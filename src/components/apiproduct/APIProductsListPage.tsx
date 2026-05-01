@@ -6,11 +6,9 @@ import {
   useActiveNamespace,
   NamespaceBar,
   ListPageCreateLink,
-  useAccessReview,
 } from '@openshift-console/dynamic-plugin-sdk';
 import ResourceList from '../ResourceList';
 import { RESOURCES } from '../../utils/resources';
-import { getResourceNameFromKind } from '../../utils/getModelFromResource';
 import { useAPIManagementRBAC } from '../../utils/apiManagementRBAC';
 import NoPermissionsView from '../NoPermissionsView';
 import '../kuadrant.css';
@@ -22,23 +20,6 @@ const APIProductsListPage: React.FC = () => {
   const { permissions, loading } = useAPIManagementRBAC();
 
   const isAllNamespaces = activeNamespace === '#ALL_NS#';
-
-  // Skip RBAC check when viewing all namespaces
-  const [canCreate, canCreateLoading] = useAccessReview(
-    !isAllNamespaces
-      ? {
-          group: RESOURCES.APIProduct.gvk.group,
-          resource: getResourceNameFromKind(RESOURCES.APIProduct.gvk.kind),
-          verb: 'create',
-          namespace: activeNamespace,
-        }
-      : {
-          group: RESOURCES.APIProduct.gvk.group,
-          resource: getResourceNameFromKind(RESOURCES.APIProduct.gvk.kind),
-          verb: 'create',
-          namespace: '',
-        },
-  );
 
   const handleNamespaceChange = (namespace: string) => {
     if (namespace !== '#ALL_NS#') {
@@ -85,7 +66,7 @@ const APIProductsListPage: React.FC = () => {
             emptyResourceName="API Products"
           />
           <div className="kuadrant-resource-create-button pf-u-mt-md">
-            {!canCreateLoading && canCreate && !isAllNamespaces ? (
+            {permissions.apiproducts.canCreate && !isAllNamespaces ? (
               <ListPageCreateLink to={`/kuadrant/ns/${activeNamespace}/apiproducts/~new`}>
                 {t('Create API Product')}
               </ListPageCreateLink>
