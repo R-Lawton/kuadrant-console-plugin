@@ -13,7 +13,9 @@ import NoPermissionsView from '../NoPermissionsView';
  */
 const APIKeyRequestListPage: React.FC = () => {
   const { t } = useTranslation('plugin__kuadrant-console-plugin');
-  const { persona, permissions, loading } = useAPIManagementRBAC();
+  const { persona, permissions, loading } = useAPIManagementRBAC(undefined, {
+    resources: ['apikeyrequests'],
+  });
 
   // Show loading state while checking permissions
   if (loading) {

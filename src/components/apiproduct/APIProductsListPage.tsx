@@ -17,7 +17,9 @@ const APIProductsListPage: React.FC = () => {
   const { t } = useTranslation('plugin__kuadrant-console-plugin');
   const [activeNamespace] = useActiveNamespace();
   const navigate = useNavigate();
-  const { permissions, loading } = useAPIManagementRBAC();
+  const { permissions, loading } = useAPIManagementRBAC(undefined, {
+    resources: ['apiproducts'],
+  });
 
   const isAllNamespaces = activeNamespace === '#ALL_NS#';
 
