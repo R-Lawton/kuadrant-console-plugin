@@ -72,7 +72,7 @@ test.describe('API Key Lifecycle', () => {
     execSync(`kubectl delete apikey ${testAPIKeyName} -n ${TEST_NAMESPACE} --ignore-not-found=true`, { stdio: 'inherit' });
   });
 
-  test('should complete full API key lifecycle: request, reveal, and delete', { tag: '@smoke' }, async ({ page }) => {
+  test('should complete full API key lifecycle: request, reveal, and delete', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
     // Step 1: Navigate to My API Keys page
     await navigateToMyAPIKeys(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
@@ -247,7 +247,7 @@ test.describe('API Key Lifecycle', () => {
     await expect(deletedKeyRow).not.toBeVisible({ timeout: 10000 });
   });
 
-  test('should show disabled request button when namespace is not selected', { tag: '@smoke' }, async ({ page }) => {
+  test('should show disabled request button when namespace is not selected', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
     // Navigate to all namespaces view
     await spaNavigate(page, '/kuadrant/apikeys/all-namespaces');
     await page.waitForLoadState('networkidle');
@@ -265,7 +265,7 @@ test.describe('API Key Lifecycle', () => {
     });
   });
 
-  test('should validate API key name format in request form', { tag: '@nightly' }, async ({ page }) => {
+  test('should validate API key name format in request form', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
     await navigateToMyAPIKeys(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
     await dismissConsoleTour(page);
@@ -316,7 +316,7 @@ test.describe('API Key Lifecycle', () => {
     await expect(errorMessage).not.toBeVisible();
   });
 
-  test('should filter API products in request form', { tag: '@nightly' }, async ({ page }) => {
+  test('should filter API products in request form', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
     await navigateToMyAPIKeys(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
     await dismissConsoleTour(page);
@@ -456,7 +456,7 @@ EOF
 
   test(
     'expiry date set → appears in UI → fast-forward → shows Expired',
-    { tag: '@nightly' },
+    { tag: ['@nightly', '@kuadrant'] },
     async ({ page }) => {
       // Step 1: approval table shows expiration date
       await navigateAsOwner(page);

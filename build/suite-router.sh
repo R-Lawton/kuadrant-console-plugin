@@ -97,6 +97,11 @@ if echo "$CHANGED" | grep -qE "^src/components/(AttachedResources|gateway/Gatewa
   SPECS="$SPECS attached-tab.spec.ts"
 fi
 
+# MCP plugin — no specs yet; add mapping here when mcp tests land
+# if echo "$CHANGED" | grep -qE "^src/components/mcp/"; then
+#   SPECS="$SPECS <mcp-spec>.spec.ts"
+# fi
+
 # Detect test files that changed → run all tags (smoke + nightly) for those files only
 TEST_SPECS=""
 CHANGED_SPECS=$(echo "$CHANGED" | grep -E "^e2e/tests/[a-z0-9-]+\.spec\.ts$" || true)

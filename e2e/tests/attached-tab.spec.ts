@@ -106,7 +106,7 @@ spec:
 
   test(
     'Gateway Attached tab shows HTTPRoute and AuthPolicy',
-    { tag: '@nightly' },
+    { tag: ['@nightly', '@gateway'] },
     async ({ page }) => {
       await gotoPage(page, `/k8s/ns/${namespace}/gateway.networking.k8s.io~v1~Gateway/${gateway}`);
 
@@ -135,7 +135,7 @@ spec:
     },
   );
 
-  test('HTTPRoute Attached tab shows Gateway', { tag: '@nightly' }, async ({ page }) => {
+  test('HTTPRoute Attached tab shows Gateway', { tag: ['@nightly', '@gateway'] }, async ({ page }) => {
     await gotoPage(
       page,
       `/k8s/ns/${namespace}/gateway.networking.k8s.io~v1~HTTPRoute/${httproute}`,
@@ -160,7 +160,7 @@ spec:
 
   test(
     'navigates from Attached tab to HTTPRoute details',
-    { tag: '@nightly' },
+    { tag: ['@nightly', '@gateway'] },
     async ({ page }) => {
       await gotoPage(page, `/k8s/ns/${namespace}/gateway.networking.k8s.io~v1~Gateway/${gateway}`);
 
@@ -181,7 +181,7 @@ spec:
 
   test(
     'navigates from Attached tab to AuthPolicy details',
-    { tag: '@nightly' },
+    { tag: ['@nightly', '@gateway'] },
     async ({ page }) => {
       await gotoPage(page, `/k8s/ns/${namespace}/gateway.networking.k8s.io~v1~Gateway/${gateway}`);
 
