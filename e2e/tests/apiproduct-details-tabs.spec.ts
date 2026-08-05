@@ -38,7 +38,7 @@ test.describe('APIProduct Details Page - Custom Tabs', () => {
     await dismissConsoleTour(page);
   });
 
-  test('should display custom plugin tabs on APIProduct detail page', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should display custom plugin tabs on APIProduct detail page', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     // Navigate to APIProduct detail page
     await navigateToAPIProductDetails(page, TEST_NAMESPACE, API_PRODUCT_NAME);
 
@@ -65,7 +65,7 @@ test.describe('APIProduct Details Page - Custom Tabs', () => {
     ).toBeVisible();
   });
 
-  test('should display Definition tab empty state when no spec available', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should display Definition tab empty state when no spec available', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     const { execSync } = await import('child_process');
     const testNs = `test-tabs-${Date.now()}`;
     const httpRouteName = 'test-route-no-spec';
@@ -132,7 +132,7 @@ spec:
     }
   });
 
-  test('should display Definition tab with OpenAPI spec (Swagger UI)', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should display Definition tab with OpenAPI spec (Swagger UI)', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     // Use toystore-api which has a valid openAPISpecURL that the controller syncs
     const TOYSTORE_API = 'toystore-api';
 
@@ -149,7 +149,7 @@ spec:
     });
   });
 
-  test('should display Policies tab empty state when no policies attached', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should display Policies tab empty state when no policies attached', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     const { execSync } = await import('child_process');
     const testNs = `test-tabs-${Date.now()}`;
     const httpRouteName = 'test-route-no-policies';
@@ -216,7 +216,7 @@ spec:
     }
   });
 
-  test('should display Policies tab with actual policies when they exist', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should display Policies tab with actual policies when they exist', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     const { execSync } = await import('child_process');
     const testNs = `test-tabs-${Date.now()}`;
     const httpRouteName = 'test-route-with-policies';
@@ -314,7 +314,7 @@ spec:
     }
   });
 
-  test('should display Target tab with HTTPRoute targetRef', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should display Target tab with HTTPRoute targetRef', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductTab(page, TEST_NAMESPACE, API_PRODUCT_NAME, 'targetref');
 
     // Verify HTTPRoute targetRef is displayed
@@ -325,7 +325,7 @@ spec:
     await expect(httpRouteText).toBeVisible({ timeout: 10_000 });
   });
 
-  test('should navigate between custom tabs successfully', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should navigate between custom tabs successfully', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductDetails(page, TEST_NAMESPACE, API_PRODUCT_NAME);
 
     // Click on Definition tab

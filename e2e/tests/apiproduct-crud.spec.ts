@@ -32,7 +32,7 @@ test.describe('APIProduct CRUD Operations', () => {
     }
   });
 
-  test('should navigate from list page to create page via Create button', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should navigate from list page to create page via Create button', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     // Navigate to API Products list page
     await navigateToAPIProducts(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
@@ -56,7 +56,7 @@ test.describe('APIProduct CRUD Operations', () => {
     await expect(page.locator('#resource-name')).toBeVisible();
   });
 
-  test('should create APIProduct via form and verify in list', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should create APIProduct via form and verify in list', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     // Full page load to a namespace-scoped URL so the console sets activeNamespace to
     // TEST_NAMESPACE before we SPA-navigate to the create page. Without this,
     // useActiveNamespace() returns '#ALL_NS#' and k8sCreate posts to an invalid namespace.
@@ -138,7 +138,7 @@ test.describe('APIProduct CRUD Operations', () => {
     expect(found, `"${generatedResourceName}" not found in any page of the API Products list`).toBe(true);
   });
 
-  test('should validate resource name format', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should validate resource name format', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
 
@@ -198,7 +198,7 @@ test.describe('APIProduct CRUD Operations', () => {
     }
   });
 
-  test('should sync between Form and YAML views', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should sync between Form and YAML views', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     // Full page load first so activeNamespace is set correctly before SPA navigation
     await page.goto(`/k8s/ns/${TEST_NAMESPACE}`);
     await page.waitForLoadState('networkidle');
@@ -304,7 +304,7 @@ test.describe('APIProduct CRUD Operations', () => {
     await expect(page.locator('#httproute-select')).toContainText('test-httproute');
   });
 
-  test('should disable Deprecated and Retired statuses', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should disable Deprecated and Retired statuses', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
 
@@ -330,7 +330,7 @@ test.describe('APIProduct CRUD Operations', () => {
     expect(await retiredOption.isDisabled()).toBe(true);
   });
 
-  test('should prevent form submission on Enter in tags', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should prevent form submission on Enter in tags', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
 
@@ -364,7 +364,7 @@ test.describe('APIProduct CRUD Operations', () => {
     await expect(page.locator('text=Create API Product')).toBeVisible();
   });
 
-  test('should create APIProduct via YAML view and verify in list', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should create APIProduct via YAML view and verify in list', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     await page.goto(`/k8s/ns/${TEST_NAMESPACE}`);
     await page.waitForLoadState('networkidle');
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
@@ -472,7 +472,7 @@ EOF`, { stdio: 'inherit' });
       }
     });
 
-  test('should edit existing APIProduct (resource name immutable)', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should edit existing APIProduct (resource name immutable)', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     const testProductName = editProductName;
     await spaNavigate(page, `/kuadrant/apiproducts/ns/${TEST_NAMESPACE}/${testProductName}/edit`);
 
@@ -524,7 +524,7 @@ EOF`, { stdio: 'inherit' });
     await expect(descriptionInput).toHaveValue('Updated description for testing');
   });
 
-  test('should delete APIProduct with confirmation', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should delete APIProduct with confirmation', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     const testProductName = editProductName;
 
     // Navigate to APIProducts list
@@ -580,7 +580,7 @@ EOF`, { stdio: 'inherit' });
     await expect(row).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('should edit existing APIProduct via YAML view and verify changes persist', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should edit existing APIProduct via YAML view and verify changes persist', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     const testProductName = editProductName;
     await spaNavigate(page, `/kuadrant/apiproducts/ns/${TEST_NAMESPACE}/${testProductName}/edit`);
 
@@ -628,7 +628,7 @@ EOF`, { stdio: 'inherit' });
     await expect(page.locator('#display-name')).toHaveValue('YAML Edited Product', { timeout: 10000 });
   });
 
-  test('should change publish status via edit form and verify status updates in list', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should change publish status via edit form and verify status updates in list', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     const testProductName = editProductName;
     await spaNavigate(page, `/kuadrant/apiproducts/ns/${TEST_NAMESPACE}/${testProductName}/edit`);
 
@@ -664,7 +664,7 @@ EOF`, { stdio: 'inherit' });
 
   }); // end of 'edit and delete' describe
 
-  test('should display validation messages for required fields', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should display validation messages for required fields', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
     await expect(page.locator('#display-name')).toBeVisible({ timeout: 20000 });
 
@@ -682,7 +682,7 @@ EOF`, { stdio: 'inherit' });
     await expect(saveButton).toBeDisabled();
   });
 
-  test('should handle approval mode selection', { tag: ['@smoke', '@kuadrant'] }, async ({ page }) => {
+  test('should handle approval mode selection', { tag: ['@smoke', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
     await expect(page.locator('#display-name')).toBeVisible({ timeout: 20000 });
 
@@ -705,7 +705,7 @@ EOF`, { stdio: 'inherit' });
     await expect(automaticRadio).not.toBeChecked();
   });
 
-  test('should auto-generate resource name with unique suffix', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should auto-generate resource name with unique suffix', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
 
@@ -731,7 +731,7 @@ EOF`, { stdio: 'inherit' });
     expect(secondGenerated).toBe(firstGenerated);
   });
 
-  test('should handle special characters in display name conversion', { tag: ['@nightly', '@kuadrant'] }, async ({ page }) => {
+  test('should handle special characters in display name conversion', { tag: ['@nightly', '@api-management'] }, async ({ page }) => {
     await navigateToAPIProductCreate(page, TEST_NAMESPACE);
     await page.waitForLoadState('networkidle');
 
