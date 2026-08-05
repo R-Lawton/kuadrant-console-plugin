@@ -9,53 +9,48 @@ on:
   workflow_dispatch:
 
 jobs:
-  changes:
+  i18n:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-    outputs:
-      src: ${{ steps.filter.outputs.src }}
+
     steps:
-      - id: filter
+      - name: Check for source changes
+        id: changes
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "src=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           FILES=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
-          if echo "$FILES" | grep -qvE '(\.md$|^docs/|^\.github/|^LICENSE$)'; then
+          if echo "$FILES" | grep -qvE '(\.md$|^docs/|^\.github/|^LICENSE$|^charts/|^config/|^kuadrant-dev-setup/|^\.devcontainer/)'; then
             echo "src=true" >> "$GITHUB_OUTPUT"
           else
             echo "src=false" >> "$GITHUB_OUTPUT"
           fi
 
-  i18n:
-    needs: changes
-    if: needs.changes.outputs.src == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
       - name: Checkout code
+        if: github.event_name != 'pull_request' || steps.changes.outputs.src == 'true'
         uses: actions/checkout@v3
 
       - name: Set up Node.js
+        if: github.event_name != 'pull_request' || steps.changes.outputs.src == 'true'
         uses: actions/setup-node@v3
         with:
           node-version: '22'
 
       - name: Enable Corepack
+        if: github.event_name != 'pull_request' || steps.changes.outputs.src == 'true'
         run: corepack enable
 
       - name: Install dependencies
+        if: github.event_name != 'pull_request' || steps.changes.outputs.src == 'true'
         run: yarn install
 
       - name: Run i18n generation
+        if: github.event_name != 'pull_request' || steps.changes.outputs.src == 'true'
         run: yarn i18n
 
       - name: Check for changes
+        if: github.event_name != 'pull_request' || steps.changes.outputs.src == 'true'
         run: |
           if [[ $(git status --porcelain) ]]; then
             echo "i18n generation caused changes, failing the build."
