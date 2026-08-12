@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { sortable } from '@patternfly/react-table';
+import { SortByDirection } from '@patternfly/react-table';
 import {
   Alert,
   AlertGroup,
@@ -8,34 +8,45 @@ import {
   EmptyState,
   EmptyStateBody,
   Title,
-  ToolbarItem,
-  ToolbarGroup,
-  Select,
-  MenuToggle,
-  InputGroup,
-  TextInput,
-  MenuToggleElement,
-  SelectOption,
-  Toolbar,
-  ToolbarContent,
 } from '@patternfly/react-core';
+import {
+  DataViewCheckboxFilter,
+  DataViewFilters,
+  DataViewTextFilter,
+  DataViewToolbar,
+} from '@patternfly/react-data-view';
 import {
   K8sResourceCommon,
   ResourceLink,
   useK8sWatchResources,
-  VirtualizedTable,
   Timestamp,
-  RowProps,
-  TableColumn,
   WatchK8sResource,
   ListPageBody,
-  TableData,
 } from '@openshift-console/dynamic-plugin-sdk';
 import { SearchIcon } from '@patternfly/react-icons';
-import { getStatusLabel } from '../utils/statusLabel';
+import { getStatusLabel, getStatusSortRank } from '../utils/statusLabel';
 import DropdownWithKebab from './DropdownWithKebab';
 import useAccessReviews from '../utils/resourceRBAC';
 import { getResourceNameFromKind } from '../utils/getModelFromResource';
+import KuadrantDataView, {
+  KuadrantDataViewColumn,
+  useKuadrantDataViewPagination,
+} from './KuadrantDataView';
+
+type AdditionalFilter = {
+  label: string;
+  allLabel: string;
+  options: string[];
+  filterFn: (item: K8sResourceCommon, selectedValue: string) => boolean;
+};
+
+type ResourceRenderers = Record<
+  string,
+  (
+    column: KuadrantDataViewColumn<K8sResourceCommon>,
+    resource: K8sResourceCommon,
+  ) => React.ReactNode
+>;
 
 type ResourceListProps = {
   resources: Array<{
@@ -46,15 +57,16 @@ type ResourceListProps = {
   namespace?: string;
   emptyResourceName?: string;
   paginationLimit?: number;
-  columns?: TableColumn<K8sResourceCommon>[];
-  renderers?: Record<
-    string,
-    (
-      column: TableColumn<K8sResourceCommon>,
-      resource: K8sResourceCommon,
-      activeColumnIDs: Set<string>,
-    ) => React.ReactNode
-  >;
+  columns?: KuadrantDataViewColumn<K8sResourceCommon>[];
+  renderers?: ResourceRenderers;
+  additionalFilters?: AdditionalFilter[];
+};
+
+type ResourceFilterValues = {
+  name: string;
+  namespace: string;
+  type: string;
+  [key: string]: string | string[];
 };
 
 const ResourceList: React.FC<ResourceListProps> = ({
@@ -64,6 +76,7 @@ const ResourceList: React.FC<ResourceListProps> = ({
   columns,
   renderers,
   emptyResourceName = 'Policies',
+  additionalFilters = [],
 }) => {
   const { t } = useTranslation('plugin__kuadrant-console-plugin');
 
@@ -128,206 +141,187 @@ const ResourceList: React.FC<ResourceListProps> = ({
   const combinedLoadError =
     loadErrors.length > 0 ? new Error(loadErrors.map((err) => err.message).join('; ')) : null;
 
-  // Implement local filter state
-  const [filters, setFilters] = React.useState<string>('');
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [filterSelected, setFilterSelected] = React.useState('Name');
-  const [filteredData, setFilteredData] = React.useState<K8sResourceCommon[]>([]);
+  const additionalFilterEntries = React.useMemo(
+    () =>
+      additionalFilters.map((filter, index) => ({
+        filter,
+        id: `additional-${index}`,
+      })),
+    [additionalFilters],
+  );
+  const [filterValues, setFilterValues] = React.useState<ResourceFilterValues>({
+    name: '',
+    namespace: '',
+    type: '',
+  });
 
-  const onToggleClick = () => setIsOpen(!isOpen);
+  const emptyFilterValues = React.useMemo<ResourceFilterValues>(
+    () =>
+      additionalFilterEntries.reduce((values, { id }) => ({ ...values, [id]: [] }), {
+        name: '',
+        namespace: '',
+        type: '',
+      } as ResourceFilterValues),
+    [additionalFilterEntries],
+  );
 
-  const onFilterSelect = (
-    _event: React.MouseEvent<Element, MouseEvent> | undefined,
-    selection: string,
-  ) => {
-    setFilterSelected(selection);
-    setIsOpen(false);
-  };
+  const filteredData = React.useMemo(
+    () =>
+      allData.filter((item) => {
+        const nameFilter = filterValues.name.toLowerCase();
+        const namespaceFilter = filterValues.namespace.toLowerCase();
+        const typeFilter = filterValues.type.toLowerCase();
+        const matchesStandardFilters =
+          (!nameFilter || item.metadata.name.toLowerCase().includes(nameFilter)) &&
+          (!namespaceFilter || item.metadata.namespace?.toLowerCase().includes(namespaceFilter)) &&
+          (!typeFilter || item.kind.toLowerCase().includes(typeFilter));
 
-  React.useEffect(() => {
-    let data = allData;
-    if (filters) {
-      const filterValue = filters.toLowerCase();
-      data = data.filter((item) => {
-        if (filterSelected === 'Name') {
-          return item.metadata.name.toLowerCase().includes(filterValue);
-        } else if (filterSelected === 'Namespace') {
-          return item.metadata.namespace?.toLowerCase().includes(filterValue);
-        } else if (filterSelected === 'Type') {
-          return item.kind.toLowerCase().includes(filterValue);
-        }
-        return true;
-      });
-    }
-    setFilteredData(data);
-  }, [allData, filters, filterSelected]);
+        return (
+          matchesStandardFilters &&
+          additionalFilterEntries.every(({ filter, id }) => {
+            const selectedValues = filterValues[id];
+            return (
+              !Array.isArray(selectedValues) ||
+              selectedValues.length === 0 ||
+              selectedValues.some((value) => filter.filterFn(item, value))
+            );
+          })
+        );
+      }),
+    [additionalFilterEntries, allData, filterValues],
+  );
 
-  const defaultColumns: TableColumn<K8sResourceCommon>[] = [
-    {
-      title: t('plugin__kuadrant-console-plugin~Name'),
-      id: 'name',
-      sort: 'metadata.name',
-      transforms: [sortable],
-    },
-    {
-      title: t('plugin__kuadrant-console-plugin~Type'),
-      id: 'type',
-      sort: 'kind',
-      transforms: [sortable],
-    },
-    {
-      title: t('plugin__kuadrant-console-plugin~Namespace'),
-      id: 'namespace',
-      sort: 'metadata.namespace',
-      transforms: [sortable],
-    },
-    {
-      title: t('plugin__kuadrant-console-plugin~Target'),
-      id: 'target',
-    },
-    {
-      title: t('plugin__kuadrant-console-plugin~Status'),
-      id: 'Status',
-    },
-    {
-      title: t('plugin__kuadrant-console-plugin~Created'),
-      id: 'Created',
-      sort: 'metadata.creationTimestamp',
-      transforms: [sortable],
-    },
-    {
-      title: '', // No title for the kebab column
-      id: 'kebab',
-      props: { className: 'pf-v6-c-table__action' },
-    },
-  ];
+  const defaultColumns = React.useMemo<KuadrantDataViewColumn<K8sResourceCommon>[]>(
+    () => [
+      {
+        title: t('plugin__kuadrant-console-plugin~Name'),
+        id: 'name',
+        sort: 'metadata.name',
+      },
+      {
+        title: t('plugin__kuadrant-console-plugin~Type'),
+        id: 'type',
+        sort: 'kind',
+      },
+      {
+        title: t('plugin__kuadrant-console-plugin~Namespace'),
+        id: 'namespace',
+        sort: 'metadata.namespace',
+      },
+      {
+        title: t('plugin__kuadrant-console-plugin~Target'),
+        id: 'target',
+      },
+      {
+        title: t('plugin__kuadrant-console-plugin~Status'),
+        id: 'Status',
+        sort: (data: K8sResourceCommon[], direction: SortByDirection) => {
+          const sorted = [...data].sort((a, b) => getStatusSortRank(a) - getStatusSortRank(b));
+          return direction === SortByDirection.desc ? sorted.reverse() : sorted;
+        },
+      },
+      {
+        title: t('plugin__kuadrant-console-plugin~Created'),
+        id: 'Created',
+        sort: 'metadata.creationTimestamp',
+      },
+      {
+        title: '', // No title for the kebab column
+        id: 'kebab',
+        props: { className: 'pf-v6-c-table__action' },
+      },
+    ],
+    [t],
+  );
 
   const usedColumns = columns || defaultColumns;
 
-  const [currentPage, setCurrentPage] = React.useState<number>(1);
-  const [perPage, setPerPage] = React.useState<number>(paginationLimit);
+  const {
+    page: currentPage,
+    perPage,
+    onSetPage,
+    onPerPageSelect,
+    resetPage,
+  } = useKuadrantDataViewPagination(filteredData.length, paginationLimit);
 
-  const startIndex = (currentPage - 1) * perPage;
-  const endIndex = startIndex + perPage;
-  const paginatedData = filteredData.slice(startIndex, endIndex);
-
-  const onSetPage = (
-    _event: React.MouseEvent | React.KeyboardEvent | MouseEvent,
-    pageNumber: number,
-  ) => {
-    setCurrentPage(pageNumber);
+  const onFilterChange = (_filterId: string, values: Partial<ResourceFilterValues>) => {
+    resetPage();
+    setFilterValues((current) => ({ ...current, ...values }));
   };
 
-  const onPerPageSelect = (
-    _event: React.MouseEvent | React.KeyboardEvent | MouseEvent,
-    perPageNumber: number,
-  ) => {
-    setPerPage(perPageNumber);
-    setCurrentPage(1);
+  const clearAllFilters = () => {
+    setFilterValues(emptyFilterValues);
+    resetPage();
   };
 
-  const handleFilterChange = (value: string) => {
-    setCurrentPage(1);
-    setFilters(value);
-  };
+  const getRow = React.useCallback(
+    (obj: K8sResourceCommon) => {
+      const { apiVersion, kind } = obj;
+      const [group, version] = apiVersion.includes('/') ? apiVersion.split('/') : ['', apiVersion];
 
-  const ResourceRow: React.FC<RowProps<K8sResourceCommon>> = ({ obj, activeColumnIDs }) => {
-    const { apiVersion, kind } = obj;
-    const [group, version] = apiVersion.includes('/') ? apiVersion.split('/') : ['', apiVersion];
+      return usedColumns.map((column) => {
+        if (renderers?.[column.id]) {
+          return renderers[column.id](column, obj);
+        }
 
-    return (
-      <>
-        {usedColumns.map((column) => {
-          if (renderers && renderers[column.id]) {
-            return renderers[column.id](column, obj, activeColumnIDs);
-          } else {
-            switch (column.id) {
-              case 'name':
-                return (
-                  <TableData key={column.id} id={column.id} activeColumnIDs={activeColumnIDs}>
-                    <ResourceLink
-                      groupVersionKind={{ group, version, kind }}
-                      name={obj.metadata.name}
-                      namespace={obj.metadata.namespace}
-                    />
-                  </TableData>
-                );
-              case 'type':
-                return (
-                  <TableData key={column.id} id={column.id} activeColumnIDs={activeColumnIDs}>
-                    {kind}
-                  </TableData>
-                );
-              case 'namespace':
-                return (
-                  <TableData key={column.id} id={column.id} activeColumnIDs={activeColumnIDs}>
-                    {obj.metadata.namespace ? (
-                      <ResourceLink
-                        groupVersionKind={{ version: 'v1', kind: 'Namespace' }}
-                        name={obj.metadata.namespace}
-                      />
-                    ) : (
-                      '-'
-                    )}
-                  </TableData>
-                );
-              case 'target': {
-                const targetRef = (
-                  obj as K8sResourceCommon & {
-                    spec?: {
-                      targetRef?: { group: string; version?: string; kind: string; name: string };
-                    };
-                  }
-                ).spec?.targetRef;
-                return (
-                  <TableData key={column.id} id={column.id} activeColumnIDs={activeColumnIDs}>
-                    {targetRef ? (
-                      <ResourceLink
-                        groupVersionKind={{
-                          group: targetRef.group,
-                          version: targetRef.version || 'v1',
-                          kind: targetRef.kind,
-                        }}
-                        name={targetRef.name}
-                        namespace={obj.metadata.namespace}
-                      />
-                    ) : (
-                      '-'
-                    )}
-                  </TableData>
-                );
+        switch (column.id) {
+          case 'name':
+            return (
+              <ResourceLink
+                groupVersionKind={{ group, version, kind }}
+                name={obj.metadata.name}
+                namespace={obj.metadata.namespace}
+              />
+            );
+          case 'type':
+            return kind;
+          case 'namespace':
+            return obj.metadata.namespace ? (
+              <ResourceLink
+                groupVersionKind={{ version: 'v1', kind: 'Namespace' }}
+                name={obj.metadata.namespace}
+              />
+            ) : (
+              '-'
+            );
+          case 'target': {
+            const targetRef = (
+              obj as K8sResourceCommon & {
+                spec?: {
+                  targetRef?: { group: string; version?: string; kind: string; name: string };
+                };
               }
-              case 'Status':
-                return (
-                  <TableData key={column.id} id={column.id} activeColumnIDs={activeColumnIDs}>
-                    {getStatusLabel(t, obj)}
-                  </TableData>
-                );
-              case 'Created':
-                return (
-                  <TableData key={column.id} id={column.id} activeColumnIDs={activeColumnIDs}>
-                    <Timestamp timestamp={obj.metadata.creationTimestamp} />
-                  </TableData>
-                );
-              case 'kebab':
-                return (
-                  <TableData
-                    key={column.id}
-                    id={column.id}
-                    activeColumnIDs={activeColumnIDs}
-                    className="pf-v6-c-table__action"
-                  >
-                    <DropdownWithKebab obj={obj} />
-                  </TableData>
-                );
-              default:
-                return null;
-            }
+            ).spec?.targetRef;
+            return targetRef ? (
+              <ResourceLink
+                groupVersionKind={{
+                  group: targetRef.group,
+                  version: targetRef.version || 'v1',
+                  kind: targetRef.kind,
+                }}
+                name={targetRef.name}
+                namespace={obj.metadata.namespace}
+              />
+            ) : (
+              '-'
+            );
           }
-        })}
-      </>
-    );
-  };
+          case 'Status':
+            return getStatusLabel(t, obj);
+          case 'Created':
+            return <Timestamp timestamp={obj.metadata.creationTimestamp} />;
+          case 'kebab':
+            return {
+              cell: <DropdownWithKebab obj={obj} />,
+              props: { isActionCell: true },
+            };
+          default:
+            return null;
+        }
+      });
+    },
+    [renderers, t, usedColumns],
+  );
 
   return (
     <>
@@ -340,45 +334,53 @@ const ResourceList: React.FC<ResourceListProps> = ({
       )}
       <div className="kuadrant-policy-list-body">
         <ListPageBody>
-          <Toolbar>
-            <ToolbarContent>
-              <ToolbarGroup variant="filter-group">
-                <ToolbarItem>
-                  <Select
-                    toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-                      <MenuToggle ref={toggleRef} onClick={onToggleClick} isExpanded={isOpen}>
-                        {filterSelected}
-                      </MenuToggle>
-                    )}
-                    onSelect={onFilterSelect}
-                    onOpenChange={setIsOpen}
-                    isOpen={isOpen}
-                  >
-                    {['Name', 'Namespace', 'Type'].map((option, index) => (
-                      <SelectOption key={index} value={option}>
-                        {option}
-                      </SelectOption>
-                    ))}
-                  </Select>
-                </ToolbarItem>
-
-                <ToolbarItem>
-                  <InputGroup className="pf-v6-c-input-group co-filter-group">
-                    <TextInput
-                      type="text"
-                      placeholder={t('Search by {{filterValue}}...', {
-                        filterValue: filterSelected.toLowerCase(),
-                      })}
-                      onChange={(_event, value) => handleFilterChange(value)}
-                      className="pf-v6-c-form-control co-text-filter-with-icon"
-                      aria-label="Resource search"
-                    />
-                  </InputGroup>
-                </ToolbarItem>
-              </ToolbarGroup>
-            </ToolbarContent>
-          </Toolbar>
-          {paginatedData.length === 0 && allLoaded ? (
+          <DataViewToolbar
+            clearAllFilters={clearAllFilters}
+            filters={
+              <DataViewFilters<ResourceFilterValues>
+                onChange={onFilterChange}
+                values={filterValues}
+                ouiaId="ResourceListDataViewFilters"
+              >
+                <DataViewTextFilter
+                  filterId="name"
+                  title={t('Name')}
+                  placeholder={t('Search by {{filterValue}}...', {
+                    filterValue: t('Name').toLowerCase(),
+                  })}
+                  ouiaId="ResourceListNameFilter"
+                />
+                <DataViewTextFilter
+                  filterId="namespace"
+                  title={t('Namespace')}
+                  placeholder={t('Search by {{filterValue}}...', {
+                    filterValue: t('Namespace').toLowerCase(),
+                  })}
+                  ouiaId="ResourceListNamespaceFilter"
+                />
+                <DataViewTextFilter
+                  filterId="type"
+                  title={t('Type')}
+                  placeholder={t('Search by {{filterValue}}...', {
+                    filterValue: t('Type').toLowerCase(),
+                  })}
+                  ouiaId="ResourceListTypeFilter"
+                />
+                {additionalFilterEntries.map(({ filter, id }) => (
+                  <DataViewCheckboxFilter
+                    key={id}
+                    filterId={id}
+                    title={filter.label}
+                    placeholder={filter.allLabel}
+                    options={filter.options}
+                    ouiaId={`ResourceListAdditionalFilter-${id}`}
+                  />
+                ))}
+              </DataViewFilters>
+            }
+            ouiaId="ResourceListDataViewToolbar"
+          />
+          {filteredData.length === 0 && allLoaded ? (
             <EmptyState
               titleText={
                 <Title headingLevel="h4" size="lg">
@@ -394,13 +396,16 @@ const ResourceList: React.FC<ResourceListProps> = ({
               </EmptyStateBody>
             </EmptyState>
           ) : (
-            <VirtualizedTable<K8sResourceCommon>
-              data={paginatedData}
-              unfilteredData={filteredData}
+            <KuadrantDataView<K8sResourceCommon>
+              ariaLabel={emptyResourceName}
+              data={filteredData}
               loaded={allLoaded}
               loadError={combinedLoadError}
               columns={usedColumns}
-              Row={ResourceRow}
+              getRow={getRow}
+              page={currentPage}
+              perPage={perPage}
+              ouiaId="ResourceListDataView"
             />
           )}
 

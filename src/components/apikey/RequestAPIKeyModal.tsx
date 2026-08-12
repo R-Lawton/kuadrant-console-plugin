@@ -22,11 +22,13 @@ import {
   Alert,
   Label,
   TextInput,
+  DatePicker,
 } from '@patternfly/react-core';
 import {
   useK8sWatchResource,
   useActiveNamespace,
   k8sCreate,
+  k8sDelete,
   useK8sModel,
 } from '@openshift-console/dynamic-plugin-sdk';
 import { RESOURCES, APIKey, Secret } from '../../utils/resources';
@@ -58,6 +60,10 @@ const RequestAPIKeyModal: React.FC<RequestAPIKeyModalProps> = ({ isOpen, onClose
   const [apiKeyNameError, setApiKeyNameError] = React.useState<string>('');
 
   const [useCase, setUseCase] = React.useState<string>('');
+
+  const [expirationPreset, setExpirationPreset] = React.useState<string>('none');
+  const [isExpirationSelectOpen, setIsExpirationSelectOpen] = React.useState(false);
+  const [customExpiryDate, setCustomExpiryDate] = React.useState<string>('');
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string>('');
@@ -161,6 +167,43 @@ const RequestAPIKeyModal: React.FC<RequestAPIKeyModalProps> = ({ isOpen, onClose
     setIsTierSelectOpen(false);
   };
 
+  const getExpirationPresetLabel = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setUTCHours(12, 0, 0, 0);
+    const dateStr = date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+    return t('{{days}} days ({{date}})', { days, date: dateStr });
+  };
+
+  const isCustomDateValid = (): boolean => {
+    if (!customExpiryDate) return false;
+    // Must match YYYY-MM-DD (full date, not partial like "2026-07")
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(customExpiryDate)) return false;
+    const date = new Date(customExpiryDate);
+    if (isNaN(date.getTime())) return false;
+    return date >= new Date(new Date().toLocaleDateString('en-CA'));
+  };
+
+  const computeExpiresAt = (): string | undefined => {
+    if (expirationPreset === 'none') return undefined;
+    if (expirationPreset === 'custom') {
+      if (!isCustomDateValid()) return undefined;
+      return new Date(customExpiryDate).toISOString();
+    }
+    const days = parseInt(expirationPreset, 10);
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setUTCHours(0, 0, 0, 0);
+    return date.toISOString();
+  };
+
+  const todayFormatted = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD for DatePicker min
+
   const handleClose = () => {
     setSelectedAPIProduct('');
     setSearchValue('');
@@ -172,6 +215,9 @@ const RequestAPIKeyModal: React.FC<RequestAPIKeyModalProps> = ({ isOpen, onClose
     setApiKeyNameTouched(false);
     setApiKeyNameError('');
     setUseCase('');
+    setExpirationPreset('none');
+    setIsExpirationSelectOpen(false);
+    setCustomExpiryDate('');
     setIsSubmitting(false);
     setSubmitError('');
     onClose();
@@ -274,47 +320,10 @@ const RequestAPIKeyModal: React.FC<RequestAPIKeyModalProps> = ({ isOpen, onClose
       // Step 1: Generate API key
       const generatedKey = generateApiKey();
 
-      // Step 2: Create Secret with the generated API key
-      const secretResource: Secret = {
-        apiVersion: 'v1',
-        kind: 'Secret',
-        metadata: {
-          name: secretName,
-          namespace: activeNamespace,
-        },
-        type: 'Opaque',
-        stringData: {
-          api_key: generatedKey,
-        },
-      };
-
-      try {
-        await k8sCreate({ model: secretModel, data: secretResource });
-      } catch (secretError: unknown) {
-        // If secret already exists, continue (idempotent operation)
-        if (typeof secretError === 'object' && secretError !== null) {
-          const error = secretError as Record<string, unknown>;
-          const isAlreadyExists =
-            error.code === 409 ||
-            error.reason === 'AlreadyExists' ||
-            (typeof error.message === 'string' &&
-              (error.message.includes('already exists') ||
-                error.message.includes('AlreadyExists')));
-
-          if (!isAlreadyExists) {
-            // Re-throw any other secret creation error
-            throw secretError;
-          }
-        } else {
-          // Re-throw non-object errors
-          throw secretError;
-        }
-      }
-
-      // Step 3: Create APIKey with reference to the secret
-      // Get selected API product to include namespace in cross-namespace reference
+      // Step 2: Create the APIKey first so the Secret can reference its uid as owner
       const product = activeAPIProducts.find((p) => p.metadata.name === selectedAPIProduct);
 
+      const expiresAtValue = computeExpiresAt();
       const apiKeyResource: APIKey = {
         apiVersion: `${RESOURCES.APIKey.gvk.group}/${RESOURCES.APIKey.gvk.version}`,
         kind: RESOURCES.APIKey.gvk.kind,
@@ -336,11 +345,47 @@ const RequestAPIKeyModal: React.FC<RequestAPIKeyModalProps> = ({ isOpen, onClose
             email: `${sanitizedUsername}@example.com`,
           },
           ...(useCase && { useCase }),
+          ...(expiresAtValue && { expiresAt: expiresAtValue }),
         },
       };
 
       const model = getModelFromResource(apiKeyResource);
-      await k8sCreate({ model, data: apiKeyResource });
+      const createdAPIKey = await k8sCreate<APIKey>({ model, data: apiKeyResource });
+
+      // Step 3: Create the Secret owned by the APIKey so it is garbage-collected on delete
+      const secretResource: Secret = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name: secretName,
+          namespace: activeNamespace,
+          ownerReferences: [
+            {
+              apiVersion: createdAPIKey.apiVersion,
+              kind: createdAPIKey.kind,
+              name: createdAPIKey.metadata.name,
+              uid: createdAPIKey.metadata.uid,
+              blockOwnerDeletion: false,
+            },
+          ],
+        },
+        type: 'Opaque',
+        stringData: {
+          api_key: generatedKey,
+        },
+      };
+
+      try {
+        await k8sCreate({ model: secretModel, data: secretResource });
+      } catch (secretError: unknown) {
+        // Roll back the APIKey so a failed Secret create doesn't leave it dangling
+        try {
+          await k8sDelete({ model, resource: createdAPIKey });
+        } catch (rollbackError) {
+          console.error('Failed to roll back APIKey after Secret creation error:', rollbackError);
+        }
+        throw secretError;
+      }
 
       // Success - close modal
       handleClose();
@@ -517,6 +562,75 @@ const RequestAPIKeyModal: React.FC<RequestAPIKeyModalProps> = ({ isOpen, onClose
             </FormHelperText>
           </FormGroup>
 
+          <FormGroup label={t('Expiration')} fieldId="expiration-select">
+            <Select
+              id="expiration-select"
+              isOpen={isExpirationSelectOpen}
+              selected={expirationPreset}
+              onSelect={(_event, value) => {
+                setExpirationPreset(value as string);
+                setCustomExpiryDate('');
+                setIsExpirationSelectOpen(false);
+              }}
+              onOpenChange={(isOpen) => setIsExpirationSelectOpen(isOpen)}
+              toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+                <MenuToggle
+                  ref={toggleRef}
+                  onClick={() => setIsExpirationSelectOpen(!isExpirationSelectOpen)}
+                  isExpanded={isExpirationSelectOpen}
+                  isFullWidth
+                >
+                  {expirationPreset === 'none'
+                    ? t('No expiration')
+                    : expirationPreset === 'custom'
+                    ? t('Custom')
+                    : getExpirationPresetLabel(parseInt(expirationPreset, 10))}
+                </MenuToggle>
+              )}
+            >
+              <SelectList>
+                <SelectOption value="7">{getExpirationPresetLabel(7)}</SelectOption>
+                <SelectOption value="30">{getExpirationPresetLabel(30)}</SelectOption>
+                <SelectOption value="60">{getExpirationPresetLabel(60)}</SelectOption>
+                <SelectOption value="90">{getExpirationPresetLabel(90)}</SelectOption>
+                <SelectOption value="custom">{t('Custom')}</SelectOption>
+                <SelectOption value="none">{t('No expiration')}</SelectOption>
+              </SelectList>
+            </Select>
+            {expirationPreset === 'custom' && (
+              <DatePicker
+                style={{ marginTop: '8px' }}
+                value={customExpiryDate}
+                onChange={(_event, value) => setCustomExpiryDate(value)}
+                placeholder={t('Select date')}
+                aria-label={t('Custom expiry date')}
+                validators={[
+                  (date) => {
+                    const today = new Date(todayFormatted);
+                    return date < today ? t('Date must be today or in the future') : '';
+                  },
+                ]}
+              />
+            )}
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem
+                  variant={
+                    expirationPreset === 'custom' && customExpiryDate && !isCustomDateValid()
+                      ? 'error'
+                      : 'default'
+                  }
+                >
+                  {expirationPreset === 'custom' && customExpiryDate && !isCustomDateValid()
+                    ? t('Enter a valid date (YYYY-MM-DD) that is today or in the future')
+                    : expirationPreset === 'none'
+                    ? t('The key will not expire.')
+                    : t('The key will be automatically revoked on this date.')}
+                </HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          </FormGroup>
+
           <FormGroup label={t('Use Case')} fieldId="use-case">
             <TextInput
               id="use-case"
@@ -563,7 +677,8 @@ const RequestAPIKeyModal: React.FC<RequestAPIKeyModalProps> = ({ isOpen, onClose
                 !apiKeyName ||
                 !!apiKeyNameError ||
                 isSubmitting ||
-                !existingAPIKeysLoaded
+                !existingAPIKeysLoaded ||
+                (expirationPreset === 'custom' && !isCustomDateValid())
               }
               isLoading={isSubmitting}
             >

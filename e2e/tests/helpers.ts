@@ -2,8 +2,44 @@ import { Page, expect } from '@playwright/test';
 
 const TEST_NAMESPACE = 'kuadrant-test';
 
+// the guided tour can render after dismissConsoleTour has returned (slow console
+// boot, retries). its backdrop blocks clicks and aria-hides the nav, so getByRole
+// waits never match. a locator handler dismisses the tour whenever it blocks a
+// later action or auto-retrying assertion. registration is per-page, idempotent.
+const tourHandlerPages = new WeakSet<Page>();
+
+async function registerTourDismissalHandler(page: Page): Promise<void> {
+  if (tourHandlerPages.has(page)) {
+    return;
+  }
+  tourHandlerPages.add(page);
+
+  // scoped to tour modals only (skip/get started buttons) so genuine dialogs
+  // such as delete confirmations are never dismissed
+  const tourModal = page
+    .locator('.pf-v6-c-modal-box, .pf-c-modal-box')
+    .filter({
+      has: page.locator(
+        'button:has-text("Skip"), button:has-text("Get started"), button:has-text("Launch tour")',
+      ),
+    })
+    .first();
+
+  await page.addLocatorHandler(tourModal, async (modal) => {
+    await modal
+      .locator(
+        'button:has-text("Skip"), button:has-text("Get started"), button[aria-label="Close"]',
+      )
+      .first()
+      .click({ timeout: 5_000 })
+      .catch(() => undefined);
+  });
+}
+
 // dismiss any console welcome/tour modals that block interaction
 export async function dismissConsoleTour(page: Page): Promise<void> {
+  await registerTourDismissalHandler(page);
+
   const backdrop = page.locator('.pf-v6-c-backdrop');
 
   try {
@@ -73,7 +109,7 @@ export async function impersonateUser(page: Page, username: string): Promise<voi
     state: 'visible',
     timeout: 10_000,
   });
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 }
 
 // stop impersonation if active
@@ -89,12 +125,19 @@ export async function stopImpersonation(page: Page): Promise<void> {
 
 // Wait for Kuadrant plugin to load by checking for sidebar menu item
 async function waitForKuadrantPlugin(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Kuadrant', exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
+  // expect rather than waitFor: locator handlers only run before actions and
+  // auto-retrying assertion checks, so a late tour modal (which aria-hides the
+  // nav) can be dismissed while this wait is in progress
+  await expect(page.getByRole('button', { name: 'Kuadrant', exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
 // SPA navigation using pushState - preserves redux state (including impersonation)
 // page.goto() causes a full reload which destroys impersonation state
 export async function spaNavigate(page: Page, path: string): Promise<void> {
+  await registerTourDismissalHandler(page);
+
   // Wait for plugin to be ready before navigating to plugin routes
   await waitForKuadrantPlugin(page);
 
@@ -102,7 +145,28 @@ export async function spaNavigate(page: Page, path: string): Promise<void> {
     window.history.pushState({}, '', p);
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, path);
-  await page.waitForLoadState('networkidle');
+}
+
+// Scroll through all pagination pages looking for a row matching `text`.
+// Retries up to `maxAttempts` times, waiting for the watch stream between pages.
+export async function findRowWithPagination(page: Page, text: string, maxAttempts = 10): Promise<boolean> {
+  const row = page.locator(`tr:has-text("${text}")`);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (await row.isVisible()) return true;
+    const nextBtn = page.locator('button[aria-label="Go to next page"]');
+    if ((await nextBtn.count()) > 0 && !(await nextBtn.isDisabled())) {
+      await nextBtn.click();
+      await page.waitForTimeout(500);
+    } else {
+      await page.waitForTimeout(1000);
+      const firstBtn = page.locator('button[aria-label="Go to first page"]');
+      if ((await firstBtn.count()) > 0 && !(await firstBtn.isDisabled())) {
+        await firstBtn.click();
+        await page.waitForTimeout(500);
+      }
+    }
+  }
+  return false;
 }
 
 export async function navigateToPolicies(page: Page): Promise<void> {
@@ -131,7 +195,7 @@ export async function navigateToAPIKeyApprovals(page: Page, namespace?: string):
   // Full page navigation so the console reads the namespace from the URL and updates its
   // active namespace state. spaNavigate (pushState) does not trigger the namespace update.
   await page.goto(`/kuadrant/apikey-approvals/ns/${ns}`);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 }
 
 // wait for RBAC permission checks to finish loading.

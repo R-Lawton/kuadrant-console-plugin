@@ -7,6 +7,10 @@ import { ConsoleRemotePlugin } from '@openshift-console/dynamic-plugin-sdk-webpa
 
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
+const coreExtensions = require('./console-extensions.json');
+const gatewayExtensions = require('./console-extensions-gateway.json');
+const allExtensions = [...coreExtensions, ...gatewayExtensions];
+
 const isProd = process.env.NODE_ENV === 'production';
 
 interface Configuration extends WebpackConfiguration {
@@ -48,6 +52,7 @@ const config: Configuration = {
             loader: 'ts-loader',
             options: {
               configFile: path.resolve(__dirname, 'tsconfig.json'),
+              transpileOnly: true,
             },
           },
         ],
@@ -90,7 +95,9 @@ const config: Configuration = {
     },
   },
   plugins: [
-    new ConsoleRemotePlugin(),
+    new ConsoleRemotePlugin({
+      extensions: allExtensions,
+    }),
     new CopyWebpackPlugin({
       patterns: [{ from: path.resolve(__dirname, 'locales'), to: 'locales' }],
     }),

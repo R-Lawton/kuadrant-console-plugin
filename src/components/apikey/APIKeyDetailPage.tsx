@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom-v5-compat';
+import { useParams, useNavigate } from 'react-router';
 import {
   PageSection,
   Title,
@@ -19,7 +19,7 @@ import {
   TabTitleText,
 } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
-import { Link } from 'react-router-dom-v5-compat';
+import { Link } from 'react-router';
 import {
   useK8sWatchResource,
   k8sDelete,
@@ -183,7 +183,7 @@ const APIKeyDetailPage: React.FC = () => {
         <Tabs
           activeKey={activeTabKey}
           onSelect={(_event, tabIndex) => setActiveTabKey(tabIndex)}
-          aria-label="APIKey details tabs"
+          aria-label={t('APIKey details tabs')}
         >
           <Tab eventKey={0} title={<TabTitleText>{t('Details')}</TabTitleText>}>
             <APIKeyDetailsTab apiKey={apiKeyToUse} />

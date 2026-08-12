@@ -33,11 +33,11 @@ async function navigateAsOwner(page: Parameters<typeof navigateToAPIKeyApprovals
     }),
   );
   await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await impersonateUser(page, 'test-api-owner');
   await navigateToAPIKeyApprovals(page);
   await dismissConsoleTour(page);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 }
 
 // ── RBAC ──────────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ async function navigateAsOwner(page: Parameters<typeof navigateToAPIKeyApprovals
 test.describe('APIKey Approvals - RBAC', () => {
   test('user without apikeyrequests access cannot see the approval table', { tag: '@smoke' }, async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await dismissConsoleTour(page);
     await impersonateUser(page, 'test-dev');
 
@@ -54,7 +54,7 @@ test.describe('APIKey Approvals - RBAC', () => {
       window.history.pushState({}, '', path);
       window.dispatchEvent(new PopStateEvent('popstate'));
     }, '/kuadrant/apikey-approvals/ns/kuadrant-test');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await expect(page.locator('th:has-text("Requester")')).not.toBeVisible({ timeout: 10_000 });
     await expect(page.locator('td:has-text("alice@example.com")')).not.toBeVisible();
@@ -134,7 +134,7 @@ EOF
       execSync(`timeout 30 bash -c 'until kubectl get apikeyrequests -n kuadrant-test | grep -q ${aliceKey}; do sleep 1; done'`, { stdio: 'inherit' });
 
       await page.reload();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
     });
 
     test.afterEach(async () => {
@@ -155,6 +155,9 @@ EOF
       await expect(page.locator('.pf-v6-c-alert:has-text("approved successfully")')).toBeVisible({
         timeout: 30_000,
       });
+
+      const updatedAliceApproveRow = page.locator(`tr:has-text("${aliceEmail}")`);
+      await expect(updatedAliceApproveRow.locator('text=Active')).toBeVisible({ timeout: 10_000 });
     });
   });
 });
@@ -229,6 +232,9 @@ EOF
     await expect(page.locator('.pf-v6-c-alert:has-text("denied")')).toBeVisible({
       timeout: 30_000,
     });
+
+    const updatedBobRow = page.locator(`tr:has-text("${bobEmail}")`);
+    await expect(updatedBobRow.locator('text=Denied')).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -302,6 +308,9 @@ EOF
     await expect(page.locator('.pf-v6-c-alert:has-text("denied")')).toBeVisible({
       timeout: 30_000,
     });
+
+    const updatedBob2Row = page.locator(`tr:has-text("${bob2Email}")`);
+    await expect(updatedBob2Row.locator('text=Denied')).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -409,6 +418,9 @@ EOF
     await expect(page.locator('.pf-v6-c-alert:has-text("approved successfully")')).toBeVisible({
       timeout: 30_000,
     });
+
+    await expect(page.locator(`tr:has-text("${carolEmail}")`).locator('text=Active')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(`tr:has-text("${daveEmail}")`).locator('text=Active')).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -516,6 +528,9 @@ EOF
     await expect(page.locator('.pf-v6-c-alert:has-text("denied")')).toBeVisible({
       timeout: 30_000,
     });
+
+    await expect(page.locator(`tr:has-text("${ellenEmail}")`).locator('text=Denied')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(`tr:has-text("${frankEmail}")`).locator('text=Denied')).toBeVisible({ timeout: 10_000 });
   });
 });
 

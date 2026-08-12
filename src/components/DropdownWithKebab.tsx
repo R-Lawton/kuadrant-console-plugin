@@ -17,7 +17,7 @@ import {
 } from '@patternfly/react-core';
 
 import { k8sDelete, K8sResourceCommon } from '@openshift-console/dynamic-plugin-sdk';
-import { useNavigate } from 'react-router-dom-v5-compat';
+import { useNavigate } from 'react-router';
 import { RESOURCES, ResourceKind } from '../utils/resources';
 import useAccessReviews from '../utils/resourceRBAC';
 import { getModelFromResource, getResourceNameFromKind } from '../utils/getModelFromResource';
@@ -71,14 +71,13 @@ const DropdownWithKebab: React.FC<DropdownWithKebabProps> = ({ obj, onDeleteClic
   };
 
   const onEditClick = () => {
-    if (
-      obj.kind === 'AuthPolicy' ||
-      obj.kind === 'RateLimitPolicy' ||
-      obj.kind === 'TokenRateLimitPolicy' ||
-      obj.kind === 'PlanPolicy' ||
-      obj.kind === 'Gateway' ||
-      obj.kind === 'HTTPRoute'
-    ) {
+    if (obj.kind === 'Gateway' || obj.kind === 'HTTPRoute') {
+      navigate({
+        pathname: `/k8s/ns/${obj.metadata.namespace}/${obj.apiVersion.replace('/', '~')}~${
+          obj.kind
+        }/${obj.metadata.name}/edit`,
+      });
+    } else if (obj.kind === 'AuthPolicy' || obj.kind === 'RateLimitPolicy') {
       navigate({
         pathname: `/k8s/ns/${obj.metadata.namespace}/${obj.apiVersion.replace('/', '~')}~${
           obj.kind
@@ -122,7 +121,7 @@ const DropdownWithKebab: React.FC<DropdownWithKebabProps> = ({ obj, onDeleteClic
         toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
           <MenuToggle
             ref={toggleRef}
-            aria-label="kebab dropdown toggle"
+            aria-label={t('kebab dropdown toggle')}
             variant="plain"
             onClick={onToggleClick}
             isExpanded={isOpen}
